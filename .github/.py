@@ -1,4 +1,5 @@
 
+
 import mysql.connector
 from tkinter import *
 import tkinter.ttk as ttk
@@ -90,28 +91,29 @@ def display_records():
         mb.showerror("Database Error", f"Error fetching records: {err}")
 
 def add_record():
-    global connector, bk_name, bk_id, author_name, bk_status, card_id
+    global connector, bk_name, bk_id, author_name, bk_status, card_id, genre_entry
 
     if bk_status.get() == 'Issued':
         card_id_value = issuer_card()
         if card_id_value is not None:
             card_id.set(card_id_value)
+        else:
+            # If card ID is not provided, return without adding the record
+            return
 
     try:
         with connector.cursor() as cursor:
-            surety = mb.askyesno('Verify',
-                                 'Please check it once again')
+            genre = genre_entry.get()  # Add this line to retrieve the genre from the entry
+            surety = mb.askyesno('Verify', 'Please check it once again')
             if surety:
                 cursor.execute(
-                    'INSERT INTO Library (BK_NAME, BK_ID, AUTHOR_NAME, BK_STATUS, CARD_ID) VALUES (%s, %s, %s, %s, %s)',
-                    (bk_name.get(), bk_id.get(), author_name.get(), bk_status.get(), card_id.get()))
+                    'INSERT INTO Library (BK_NAME, BK_ID, AUTHOR_NAME, BK_STATUS, CARD_ID, GENRE) VALUES (%s, %s, %s, %s, %s, %s)',
+                    (bk_name.get(), bk_id.get(), author_name.get(), bk_status.get(), card_id.get(), genre))
                 connector.commit()
                 mb.showinfo('Book added', 'The new book was successfully added')
                 clear_and_display()
     except mysql.connector.IntegrityError:
-        mb.showerror('Book ID already in use!',
-                     'The Book ID you are trying to enter is already used')
-
+        mb.showerror('Book ID already in use!', 'The Book ID you are trying to enter is already used')
 
 
 
@@ -143,10 +145,10 @@ def change_availability():
 
 
 def clear_fields():
-    global bk_status, bk_id, bk_name, author_name, card_id
+    global bk_status, bk_id, bk_name, author_name, card_id, genre_entry
 
     bk_status.set('Available')
-    for i in ['bk_id', 'bk_name', 'author_name', 'card_id']:
+    for i in ['bk_id', 'bk_name', 'author_name', 'card_id', 'genre_entry']:
         eval(f"{i}.set('')")
     try:
         tree.selection_remove(tree.selection()[0])
@@ -183,17 +185,17 @@ def view_record():
 
 
 def update_record():
-    def update():
-        global bk_status, bk_name, bk_id, author_name, card_id
-        global connector, tree
+    def update(genre_entry_value):
+        global bk_status, bk_name, bk_id, author_name, card_id, connector, tree
 
         if bk_status.get() == 'Issued':
             card_id_value = issuer_card()
             if card_id_value is not None:
                 card_id.set(card_id_value)
 
-        cursor.execute('UPDATE Library SET BK_NAME=%s, BK_STATUS=%s, AUTHOR_NAME=%s, CARD_ID=%s WHERE BK_ID=%s',
-                       (bk_name.get(), bk_status.get(), author_name.get(), card_id.get(), bk_id.get()))
+        cursor.execute(
+            'UPDATE Library SET BK_NAME=%s, BK_STATUS=%s, AUTHOR_NAME=%s, CARD_ID=%s, GENRE=%s WHERE BK_ID=%s',
+            (bk_name.get(), bk_status.get(), author_name.get(), card_id.get(), genre_entry_value, bk_id.get()))
         connector.commit()
         clear_and_display()
         edit.destroy()
@@ -202,9 +204,13 @@ def update_record():
 
     edit = Toplevel(root)
     edit.title('Update Record')
-    edit.geometry('300x200')
+    edit.geometry('300x250')
 
-    Button(edit, text='Update Record', font=btn_font, bg='SteelBlue', width=20, command=update).place(x=50, y=100)
+    Label(edit, text='Genre:').pack(pady=5)
+    genre_entry = Entry(edit, width=20)
+    genre_entry.pack(pady=5)
+
+    Button(edit, text='Update Record', font=btn_font, bg='SteelBlue', width=20, command=lambda: update(genre_entry.get())).pack(pady=10)
 
 
 def remove_record():
@@ -270,13 +276,13 @@ cursor = connector.cursor()
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS Library (
         BK_NAME TEXT,
-        BK_ID TEXT PRIMARY KEY NOT NULL,
+        BK_ID VARCHAR(255) PRIMARY KEY NOT NULL UNIQUE,
         AUTHOR_NAME TEXT,
         BK_STATUS TEXT,
-        CARD_ID TEXT
+        CARD_ID TEXT,
+        GENRE TEXT
     )
 ''')
-
 
 
 
@@ -285,18 +291,18 @@ bk_name = StringVar()
 bk_id = StringVar()
 author_name = StringVar()
 card_id = StringVar()
+genre_entry = StringVar()
 btn_font = ('Gill Sans MT', 13)
 lbl_font = ('Georgia', 13)  # Font for all labels
 entry_font = ('Times New Roman', 12)  # Font for all Entry widgets
 left_frame = Frame(root, bg='black')  # Change background color to black
-left_frame.place(x=0, y=30, relwidth=0.3, relheight=0.96)
+left_frame.place(x=0, y=0, relwidth=0.3, relheight=1)  # Move up the left_frame and adjust the height
 
 RT_frame = Frame(root, bg='black')  # Change background color to black
-RT_frame.place(relx=0.3, y=30, relheight=0.2, relwidth=0.7)
+RT_frame.place(relx=0.3, y=0, relheight=0.2, relwidth=0.7)
 
 RB_frame = Frame(root, bg='black')  # Change background color to black
-RB_frame.place(relx=0.3, rely=0.24, relheight=0.785, relwidth=0.7)
-
+RB_frame.place(relx=0.3, rely=0.2, relheight=0.8, relwidth=0.7)
 Label(left_frame, text='Book Name', bg='black', font=lbl_font, fg='white').place(x=98, y=25)  # Change background color to black and text color to white
 Entry(left_frame, width=25, font=entry_font, textvariable=bk_name).place(x=45, y=55)
 
@@ -311,12 +317,16 @@ Label(left_frame, text='Status of the Book', bg='black', font=lbl_font, fg='whit
 dd = OptionMenu(left_frame, bk_status, *['Available', 'Issued'])
 dd.configure(font=entry_font, width=12)
 dd.place(x=75, y=300)
+Label(left_frame, text='Genre', bg='black', font=lbl_font, fg='white').place(x=45, y=350)  # Adjust y-coordinate
+Entry(left_frame, width=25, font=entry_font, textvariable=genre_entry).place(x=45, y=380)  # Adjust y-coordinate
 
 submit = Button(left_frame, text='Add new record', font=btn_font, bg='SteelBlue', width=20, command=add_record)
-submit.place(x=50, y=375)
+submit.place(x=50, y=450)  # Adjust y-coordinate
 
 clear = Button(left_frame, text='Clear fields', font=btn_font, bg='SteelBlue', width=20, command=clear_fields)
-clear.place(x=50, y=435)
+clear.place(x=50, y=500)
+
+
 
 RT_frame.columnconfigure(0, weight=1)  # Make the first column (label) take more space
 
@@ -328,9 +338,13 @@ Button(RT_frame, text='Change Availability', font=btn_font, bg='SteelBlue', widt
 Label(RB_frame, text='BOOK INVENTORY', bg='DodgerBlue', font=("Noto Sans CJK TC", 15, 'bold')).pack(side=TOP, fill=X)
 
 Button(RT_frame, text='Search', font=btn_font, bg='SteelBlue', width=12, command=search_record_by_id).pack(side=LEFT, padx=5, pady=5)
+Label(left_frame, text='Genre', bg='black', font=lbl_font, fg='white').place(x=110, y=415)
+Entry(left_frame, width=25, font=entry_font, textvariable=genre_entry).place(x=45, y=445)
 
+submit = Button(left_frame, text='Add new record', font=btn_font, bg='SteelBlue', width=20, command=add_record)
+submit.place(x=50, y=495)
 
-tree = ttk.Treeview(RB_frame, selectmode=BROWSE, columns=('Book Name', 'Book ID', 'Author', 'Status', 'Issuer Card ID'))
+tree = ttk.Treeview(RB_frame, selectmode=BROWSE, columns=('Book Name', 'Book ID', 'Author', 'Status', 'Issuer Card ID','Genre'))
 
 XScrollbar = Scrollbar(tree, orient=HORIZONTAL, command=tree.xview)
 YScrollbar = Scrollbar(tree, orient=VERTICAL, command=tree.yview)
@@ -343,7 +357,9 @@ tree.heading('Book Name', text='Book Name', anchor=CENTER)
 tree.heading('Book ID', text='Book ID', anchor=CENTER)
 tree.heading('Author', text='Author', anchor=CENTER)
 tree.heading('Status', text='Status of the Book', anchor=CENTER)
-tree.heading('Issuer Card ID', text='Card ID of the Issuer', anchor=CENTER)
+tree.heading('Issuer Card ID', text='Student ID', anchor=CENTER)
+tree.heading('Genre', text='Book Genre', anchor=CENTER)
+
 
 tree.column('#0', width=0, stretch=NO)
 tree.column('#1', width=225, stretch=NO)
